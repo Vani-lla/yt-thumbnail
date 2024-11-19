@@ -1,4 +1,7 @@
 widzenie
 data/thumbnails/succesfull/*
 data/thumbnails/failure/*
-models/*
+old
+test.py
+__pycache__
+
