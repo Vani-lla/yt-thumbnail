@@ -1,31 +1,39 @@
 import json
-from matplotlib import pyplot as plt
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
-import torch.optim as optim
-import torch.utils
-from torch.utils.data import DataLoader, Dataset
-from torchvision import datasets, transforms, models
+from matplotlib import pyplot as plt
+from project import *
 import numpy as np
-from os import system, environ
-from PIL import Image
-
-from prepare_kanji import get_primitive_labels
-from project import KanjiDataset
 
 
-Y = get_primitive_labels()
-transform = transforms.Compose([
-    transforms.ToTensor(),
-    transforms.Grayscale(),
-    transforms.CenterCrop((100, 100)),
-])
+device = torch.device('cuda:0')
 
-with open("data/kanji_data.json", "r") as file:
-    data: dict = json.loads(file.read())
-dataset = KanjiDataset(data, transform)
+net: Net = torch.load("models/model.pth", weights_only=False)
+net.to(device)
+net.eval()
 
+dataset = KanjiDataset(DATA, TRANSFORM)
+dataloader = DataLoader(dataset, batch_size=1, shuffle=False, )
 
-for data in dataset:
-    print(data)
+accuracy = {k: [] for k in TOP_RADICALS}
+
+for data in dataloader:
+    inputs, labels = data[0].to(device), data[1].to(device)
+
+    result = net(inputs)
+    for i, radical in enumerate(TOP_RADICALS):
+        l, r = labels[0][i].item(), result[0][i].item()
+        if l == 1:
+            if r >= .6:
+                accuracy[radical].append(1)
+            else:
+                accuracy[radical].append(0)
+        else:
+            if r < .6:
+                accuracy[radical].append(1)
+            else:
+                accuracy[radical].append(0)
+                
+for key, val in accuracy.items():
+    print(f"{key}: {np.average(val)}")
+
+# print(net)

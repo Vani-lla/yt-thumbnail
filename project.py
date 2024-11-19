@@ -1,22 +1,19 @@
 import json
-from matplotlib import pyplot as plt
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 import torch.utils
 from torch.utils.data import DataLoader, Dataset
-from torchvision import datasets, transforms, models
+from torchvision import transforms
 import numpy as np
-from os import system, environ
 from PIL import Image
 
-from prepare_kanji import TOP_RADICALS, get_primitive_labels
+from prepare_kanji import TOP_RADICALS
 
 # Detect GPU
 for i in range(torch.cuda.device_count()):
     print(torch.cuda.get_device_properties(i).name)
-environ["HSA_OVERRIDE_GFX_VERSION"] = "11.0.0"
 # export HSA_OVERRIDE_GFX_VERSION=11.0.0
 
 
@@ -33,11 +30,11 @@ class KanjiDataset(Dataset):
 
     def __getitem__(self, index):
         kanji_id = self.keys[index]
-        
+
         kanji = self.data[kanji_id]
 
         image = Image.open(f"data/kanji/{kanji_id}.png").convert("RGB")
-        image = 1 - transform(image)
+        image = TRANSFORM(image)
 
         kanji_entry: list[int] = []
         for radical in TOP_RADICALS:
@@ -55,11 +52,11 @@ class Net(nn.Module):
         self.conv2 = nn.Conv2d(4, 2, (3, 3))
         self.conv3 = nn.Conv2d(2, 2, (3, 3))
 
-        self.fc1 = nn.Linear(242, 120)
-        self.fc2 = nn.Linear(120, 84)
-        self.fc3 = nn.Linear(84, len(TOP_RADICALS))
-
-        self.sm = nn.Softmax(dim=1)
+        self.fc1 = nn.Linear(242, 242)
+        self.fc2 = nn.Linear(242, 120)
+        self.fc3 = nn.Linear(120, 84)
+        self.fc4 = nn.Linear(84, 42)
+        self.fc5 = nn.Linear(42, len(TOP_RADICALS))
 
         self.pool = nn.MaxPool2d((2, 2), (2, 2))  # (H - 2)/2 + 1 = H/2
 
@@ -75,7 +72,9 @@ class Net(nn.Module):
         fcs = [
             self.fc1,
             self.fc2,
-            self.fc3
+            self.fc3,
+            self.fc4,
+            self.fc5,
         ]
         for conv in convs:
             x = self.pool(F.relu(conv(x.float())))
@@ -84,48 +83,70 @@ class Net(nn.Module):
         for fc in fcs[:-1]:
             x = F.relu(fc(x))
 
-        x = fcs[-1](x)
+        x = F.sigmoid(fcs[-1](x))
 
         return x
 
 
-Y = get_primitive_labels()
-transform = transforms.Compose([
+TRANSFORM = transforms.Compose([
     transforms.ToTensor(),
     transforms.Grayscale(),
+    transforms.Resize((106, 106)),
     transforms.CenterCrop((100, 100)),
 ])
 
 with open("data/kanji_data.json", "r") as file:
-    data: dict = json.loads(file.read())
+    DATA: dict = json.loads(file.read())
 
-dataset = KanjiDataset(data, transform)
-dataloader = DataLoader(dataset, batch_size=32, shuffle=True, )
+if __name__ == "__main__":
+    dataset = KanjiDataset(DATA, TRANSFORM)
+    train_dataset, test_dataset = torch.utils.data.random_split(dataset, [0.8, 0.2])
+    dataloader = DataLoader(train_dataset, batch_size=32, shuffle=True, )
+    test_dataloader = DataLoader(test_dataset, batch_size=1, shuffle=True, )
 
+    net = Net()
+    device = torch.device('cuda:0')
+    net.train()
+    net.to(device)
 
-net = Net()
-device = torch.device('cuda:0')
-net.train()
-net.to(device)
+    criterion = nn.BCELoss()
+    optimizer = optim.Adam(net.parameters(), lr=0.001)
 
-criterion = nn.CrossEntropyLoss()
-optimizer = optim.Adam(net.parameters(), lr=0.001)
+    for epoch in range(50):
+        running_loss = 0.0
 
-for epoch in range(50):
-    running_loss = 0.0
+        for data in dataloader:
+            optimizer.zero_grad()
 
-    for data in dataloader:
-        optimizer.zero_grad()
+            inputs, labels = data[0].to(device), data[1].to(device)
 
-        inputs, labels = data[0].to(device), data[1].to(device)
+            outputs = net(inputs)
+            loss = criterion(outputs, labels)
+            loss.backward()
+            optimizer.step()
 
-        outputs = net(inputs)
-        loss = criterion(outputs, labels)
-        loss.backward()
-        optimizer.step()
+            running_loss += loss.item()
+            
+        accuracy = {k: [] for k in TOP_RADICALS}
+        for data in test_dataloader:
+            inputs, labels = data[0].to(device), data[1].to(device) 
+            result = net(inputs)
+            for i, radical in enumerate(TOP_RADICALS):
+                l, r = labels[0][i].item(), result[0][i].item()
+                if l == 1:
+                    if r >= .6:
+                        accuracy[radical].append(1)
+                    else:
+                        accuracy[radical].append(0)
+                else:
+                    if r < .6:
+                        accuracy[radical].append(1)
+                    else:
+                        accuracy[radical].append(0)
+                        
+        print(f'{epoch + 1:3} loss: {running_loss:5.2f}')
+        for key, val in accuracy.items():
+            print(f"{key}: {np.average(val)}")
 
-        running_loss += loss.item()
-    print(f'{epoch + 1:3} loss: {running_loss:5.2f}')
-
-torch.save(net.state_dict(), "models/model.pt")
-print('Finished Training')
+    torch.save(net, "models/model.pth")
+    print('Finished Training')
