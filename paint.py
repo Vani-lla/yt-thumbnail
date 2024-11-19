@@ -6,8 +6,13 @@ from PIL import Image
 
 pygame.init()
 
-win = pygame.display.set_mode((106*6, 106*6))
+W = H = 106*6
+
+win = pygame.display.set_mode((W, H))
 pygame.display.set_caption("Draw Kanji")
+
+# pygame.draw.line(win, (20, 20, 20), (0, W/2), (H, W/2), 3)
+# pygame.draw.line(win, (20, 20, 20), (H/2, 0), (H/2, W), 3)
 
 def main():
     run = True
@@ -20,7 +25,7 @@ def main():
         mouse_pos = pygame.mouse.get_pos()
 
         if mouse_pressed[0]:
-            pygame.draw.circle(win, (255, 255, 255), mouse_pos, 5)
+            pygame.draw.circle(win, (255, 255, 255), mouse_pos, 3)
 
         pygame.display.flip()
 
@@ -31,10 +36,10 @@ def main():
 
 if __name__ == "__main__":
     device = torch.device('cuda:0')
-    net: Net = torch.load("models/model_crazy.pth", weights_only=False)
+    net: Net = torch.load("models/model.pth", weights_only=False)
     
     img = main()
-    img = TRANSFORM(img)
+    img = 1 - TRANSFORM(img)
     img = img.reshape((1, 1, 100, 100))
     img = img.to(device)
     

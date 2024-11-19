@@ -23,8 +23,6 @@ class KanjiDataset(Dataset):
         self.keys = list(data.keys())
         self.transform = transform
 
-        # self.paths = sorted(glob.glob("data/kanji/*.jpg"))
-
     def __len__(self):
         return len(self.keys)
 
@@ -47,13 +45,12 @@ class Net(nn.Module):
     def __init__(self):
         super(Net, self).__init__()
 
-        # 1 x 100 x 100
-        self.conv1 = nn.Conv2d(1, 4, (3, 3), padding=1)
-        self.conv2 = nn.Conv2d(4, 2, (3, 3))
-        self.conv3 = nn.Conv2d(2, 2, (3, 3))
+        self.conv1 = nn.Conv2d(1, 6, (3, 3), padding=1)
+        self.conv2 = nn.Conv2d(6, 4, (6, 6))
+        self.conv3 = nn.Conv2d(4, 2, (3, 3))
 
-        self.fc1 = nn.Linear(242, 242)
-        self.fc2 = nn.Linear(242, 120)
+        self.fc1 = nn.Linear(200, 140)
+        self.fc2 = nn.Linear(140, 120)
         self.fc3 = nn.Linear(120, 84)
         self.fc4 = nn.Linear(84, 42)
         self.fc5 = nn.Linear(42, len(TOP_RADICALS))
@@ -63,11 +60,11 @@ class Net(nn.Module):
     def forward(self, x):
         convs = [
             self.conv1,  # 100x100
-            # 4x50x50 after pooling
-            self.conv2,  # 48x48
-            # 2x24x24 after pooling
-            self.conv3  # 22x22
-            # 2x11x11 after pooling
+            # 6x50x50 after pooling
+            self.conv2,  # 45x45
+            # 4x22x22 after pooling
+            self.conv3  # 19x19
+            # 2x10x10 after pooling
         ]
         fcs = [
             self.fc1,
@@ -100,7 +97,8 @@ with open("data/kanji_data.json", "r") as file:
 
 if __name__ == "__main__":
     dataset = KanjiDataset(DATA, TRANSFORM)
-    train_dataset, test_dataset = torch.utils.data.random_split(dataset, [0.8, 0.2])
+    train_dataset, test_dataset = torch.utils.data.random_split(dataset, [
+                                                                0.8, 0.2])
     dataloader = DataLoader(train_dataset, batch_size=32, shuffle=True, )
     test_dataloader = DataLoader(test_dataset, batch_size=1, shuffle=True, )
 
@@ -126,10 +124,10 @@ if __name__ == "__main__":
             optimizer.step()
 
             running_loss += loss.item()
-            
+
         accuracy = {k: [] for k in TOP_RADICALS}
         for data in test_dataloader:
-            inputs, labels = data[0].to(device), data[1].to(device) 
+            inputs, labels = data[0].to(device), data[1].to(device)
             result = net(inputs)
             for i, radical in enumerate(TOP_RADICALS):
                 l, r = labels[0][i].item(), result[0][i].item()
@@ -143,7 +141,7 @@ if __name__ == "__main__":
                         accuracy[radical].append(1)
                     else:
                         accuracy[radical].append(0)
-                        
+
         print(f'{epoch + 1:3} loss: {running_loss:5.2f}')
         for key, val in accuracy.items():
             print(f"{key}: {np.average(val)}")

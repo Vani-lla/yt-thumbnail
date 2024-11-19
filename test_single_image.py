@@ -6,13 +6,13 @@ from PIL import Image
 
 device = torch.device('cuda:0')
 
-net: Net = torch.load("models/model_crazy.pth", weights_only=False)
+net: Net = torch.load("models/model.pth", weights_only=False)
 net.to(device)
 net.eval()
 
 accuracy = {k: [] for k in TOP_RADICALS}
 img = Image.open("data/test/4.png").convert("RGB")
-img = 1 - TRANSFORM(img)
+img = TRANSFORM(img)
 img = img.reshape((1, 1, 100, 100))
 
 img = img.to(device)
