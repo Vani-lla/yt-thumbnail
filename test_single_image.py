@@ -11,7 +11,7 @@ net.to(device)
 net.eval()
 
 accuracy = {k: [] for k in TOP_RADICALS}
-img = Image.open("data/test/4.png").convert("RGB")
+img = Image.open("data/test/5.png").convert("RGB")
 img = TRANSFORM(img)
 img = img.reshape((1, 1, 100, 100))
 

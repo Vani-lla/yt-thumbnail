@@ -3,6 +3,7 @@ import numpy as np
 import torch
 from project import *
 from PIL import Image
+# import matplotlib.pyplot as plt
 
 pygame.init()
 
@@ -25,21 +26,21 @@ def main():
         mouse_pos = pygame.mouse.get_pos()
 
         if mouse_pressed[0]:
-            pygame.draw.circle(win, (255, 255, 255), mouse_pos, 3)
+            pygame.draw.circle(win, (255, 255, 255), mouse_pos, 5)
 
         pygame.display.flip()
 
     img = pygame.surfarray.pixels3d(win)
     pygame.quit()
 
-    return Image.fromarray(np.uint8(img)).convert("RGB")
+    return Image.fromarray(np.flip(np.rot90(np.uint8(img), k=-1), axis=1)).convert("RGB")
 
 if __name__ == "__main__":
     device = torch.device('cuda:0')
     net: Net = torch.load("models/model.pth", weights_only=False)
     
     img = main()
-    img = 1 - TRANSFORM(img)
+    img = TRANSFORM(img)
     img = img.reshape((1, 1, 100, 100))
     img = img.to(device)
     
