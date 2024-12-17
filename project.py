@@ -9,13 +9,20 @@ from torchvision import transforms
 import numpy as np
 from PIL import Image
 
-from prepare_kanji import TOP_RADICALS
+from prepare_kanji import TOP_RADICALS, RADICAL_WEIGHTS
 
 # Detect GPU
 for i in range(torch.cuda.device_count()):
     print(torch.cuda.get_device_properties(i).name)
 # export HSA_OVERRIDE_GFX_VERSION=11.0.0
 
+
+TRANSFORM = transforms.Compose([
+    transforms.ToTensor(),
+    transforms.Grayscale(),
+    transforms.Resize((106, 106)),
+    transforms.CenterCrop((100, 100)),
+])
 
 class KanjiDataset(Dataset):
     def __init__(self, data: dict[str, dict[str, list[float]]], transform):
@@ -80,71 +87,78 @@ class Net(nn.Module):
         for fc in fcs[:-1]:
             x = F.relu(fc(x))
 
-        x = F.sigmoid(fcs[-1](x))
+        x = fcs[-1](x)
 
         return x
 
 
-TRANSFORM = transforms.Compose([
-    transforms.ToTensor(),
-    transforms.Grayscale(),
-    transforms.Resize((106, 106)),
-    transforms.CenterCrop((100, 100)),
-])
 
 with open("data/kanji_data.json", "r") as file:
     DATA: dict = json.loads(file.read())
 
 if __name__ == "__main__":
     dataset = KanjiDataset(DATA, TRANSFORM)
-    train_dataset, test_dataset = torch.utils.data.random_split(dataset, [
-                                                                0.8, 0.2])
-    dataloader = DataLoader(train_dataset, batch_size=32, shuffle=True, )
-    test_dataloader = DataLoader(test_dataset, batch_size=1, shuffle=True, )
+    # train_dataset, test_dataset = torch.utils.data.random_split(dataset, [
+                                                                # 0.9, 0.1])
+    dataloader = DataLoader(dataset, batch_size=32, shuffle=True, )
+    test_dataloader = DataLoader(dataset, batch_size=1, shuffle=True, )
 
     net = Net()
     device = torch.device('cuda:0')
     net.train()
     net.to(device)
+    
+    weights = torch.tensor([RADICAL_WEIGHTS])
+    weights = 1 - weights.softmax(1)
+    # print(weights)
+    # print(torch.tensor([RADICAL_WEIGHTS]))
+    weights = weights.to(device)
 
-    criterion = nn.BCELoss()
+    criterion = nn.BCEWithLogitsLoss()
     optimizer = optim.Adam(net.parameters(), lr=0.001)
 
-    for epoch in range(50):
-        running_loss = 0.0
+    run = True
+    epoch = 0
+    while run:
+        try:
+            epoch += 1
+            running_loss = 0.0
 
-        for data in dataloader:
-            optimizer.zero_grad()
+            for data in dataloader:
+                optimizer.zero_grad()
 
-            inputs, labels = data[0].to(device), data[1].to(device)
+                inputs, labels = data[0].to(device), data[1].to(device)
 
-            outputs = net(inputs)
-            loss = criterion(outputs, labels)
-            loss.backward()
-            optimizer.step()
+                outputs = net(inputs)
+                loss: torch.Tensor = criterion(outputs, labels)
+                loss.backward()
+                optimizer.step()
 
-            running_loss += loss.item()
+                running_loss += loss.item()
 
-        accuracy = {k: [] for k in TOP_RADICALS}
-        for data in test_dataloader:
-            inputs, labels = data[0].to(device), data[1].to(device)
-            result = net(inputs)
-            for i, radical in enumerate(TOP_RADICALS):
-                l, r = labels[0][i].item(), result[0][i].item()
-                if l == 1:
-                    if r >= .6:
-                        accuracy[radical].append(1)
-                    else:
-                        accuracy[radical].append(0)
-                else:
-                    if r < .6:
-                        accuracy[radical].append(1)
-                    else:
-                        accuracy[radical].append(0)
+            # accuracy = {k: [] for k in TOP_RADICALS}
+            # for data in test_dataloader:
+            #     inputs, labels = data[0].to(device), data[1].to(device)
+            #     result = net(inputs)
+            #     for i, radical in enumerate(TOP_RADICALS):
+            #         l, r = labels[0][i].item(), result[0][i].item()
+            #         if l == 1:
+            #             if r >= .6:
+            #                 accuracy[radical].append(1)
+            #             else:
+            #                 accuracy[radical].append(0)
+            #         else:
+            #             if r < .6:
+            #                 accuracy[radical].append(1)
+            #             else:
+            #                 accuracy[radical].append(0)
 
-        print(f'{epoch + 1:3} loss: {running_loss:5.2f}')
-        for key, val in accuracy.items():
-            print(f"{key}: {np.average(val)}")
+            print(f'{epoch + 1:3} loss: {running_loss:5.2f}')
+            # for key, val in accuracy.items():
+            #     print(f"{key}: {np.average(val)}")
+        except KeyboardInterrupt:
+            run = False
+            
 
     torch.save(net, "models/model.pth")
     print('Finished Training')
