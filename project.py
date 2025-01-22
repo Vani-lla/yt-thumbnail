@@ -9,7 +9,7 @@ from torchvision import transforms
 import numpy as np
 from PIL import Image
 
-from prepare_kanji import TOP_RADICALS, RADICAL_WEIGHTS
+from prepare_kanji import TOP_RADICALS
 
 # Detect GPU
 for i in range(torch.cuda.device_count()):
@@ -107,12 +107,6 @@ if __name__ == "__main__":
     device = torch.device('cuda:0')
     net.train()
     net.to(device)
-    
-    weights = torch.tensor([RADICAL_WEIGHTS])
-    weights = 1 - weights.softmax(1)
-    # print(weights)
-    # print(torch.tensor([RADICAL_WEIGHTS]))
-    weights = weights.to(device)
 
     criterion = nn.BCEWithLogitsLoss()
     optimizer = optim.Adam(net.parameters(), lr=0.001)

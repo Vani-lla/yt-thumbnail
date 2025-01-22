@@ -7,7 +7,7 @@ import torch.utils
 from torch.utils.data import DataLoader, Dataset
 from PIL import Image
 
-from prepare_kanji import TOP_RADICALS, RADICAL_WEIGHTS
+from prepare_kanji import TOP_RADICALS
 from project import TRANSFORM, Net
 
 class KanjiCoordinateDataset(Dataset):

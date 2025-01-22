@@ -17,7 +17,7 @@ net.eval()
     
 with open("data/kanji_data.json", "r") as file:
     DATA: dict = json.loads(file.read())
-    
+
 # for kanji_id in DATA.keys():
 kanji_id = "0732b"
 accuracy = {k: [] for k in TOP_RADICALS}
@@ -43,7 +43,6 @@ for radical in DATA[kanji_id]:
     result = DATA[kanji_id][radical]
     ax.add_patch(patches.Rectangle((result[0], result[1]), result[2]-result[0], result[3]-result[1], linewidth=2, edgecolor='b', facecolor='b', alpha=.4))
 
-        
 # torch.onnx.export(net, img, "model.onnx", input_names=["Input Image"], output_names=["Bounding Boxes"])
 
 plt.show()
