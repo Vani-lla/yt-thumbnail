@@ -31,13 +31,13 @@ result:torch.Tensor = net(img)
 fig, ax = plt.subplots()
 ax.imshow(orig, cmap="gray")
 
-for ind, result in enumerate(np.split(result.cpu().detach().numpy()[0, :], len(TOP_RADICALS))):
-    print(TOP_RADICALS[ind], np.round(result, 1))
+# for ind, result in enumerate(np.split(result.cpu().detach().numpy()[0, :], len(TOP_RADICALS))):
+#     print(TOP_RADICALS[ind], np.round(result, 1))
     
-    if all(result > 2):
-        rect = patches.Rectangle((result[0], result[1]), result[2]-result[0], result[3]-result[1], linewidth=2, edgecolor='r', facecolor='r', alpha=.6)
-        ax.text(result[0], result[1]-3, TOP_RADICALS[ind], color='green', fontsize=24, ha='center', va='center')
-        ax.add_patch(rect)
+#     if all(result > 2):
+#         rect = patches.Rectangle((result[0], result[1]), result[2]-result[0], result[3]-result[1], linewidth=2, edgecolor='r', facecolor='r', alpha=.6)
+#         ax.text(result[0], result[1]-3, TOP_RADICALS[ind], color='green', fontsize=24, ha='center', va='center')
+#         ax.add_patch(rect)
 
 for radical in DATA[kanji_id]:
     result = DATA[kanji_id][radical]
